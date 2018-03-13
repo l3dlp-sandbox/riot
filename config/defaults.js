@@ -3,9 +3,14 @@ const commonjs = require('rollup-plugin-commonjs'),
   buble = require('rollup-plugin-buble')
 
 module.exports = {
-  format: 'umd',
-  moduleName: 'riot',
-  banner: '/* Riot WIP, @license MIT */',
+  output: {
+    name: 'riot',
+    format: 'umd',
+    banner: '/* Riot WIP, @license MIT */',
+  },
+  onwarn(warning) {
+    if (warning.code === 'CIRCULAR_DEPENDENCY') return
+  },
   plugins: [
     nodeResolve({ jsnext: true, main: true }),
     commonjs({

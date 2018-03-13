@@ -221,9 +221,9 @@ describe('Riot core', function() {
       <option value="2" selected="{v == 2}">2</option>
       <option value="3" selected="{v == 3}">3</option>
     </select>`,
-      function() {
-        this.v = 2
-      })
+    function() {
+      this.v = 2
+    })
 
     var tag = riot.mount('tmp-select-tag')[0]
 
@@ -331,7 +331,7 @@ describe('Riot core', function() {
 
   it('the case of attributes prefixed with riot should be leaved untouched', function() {
     riot.tag('crazy-svg', `
-      <svg riot-viewBox="{'0 0 300 300'}">
+      <svg preserveAspectRatio="xMinYMax meet" riot-viewBox="{'0 0 300 300'}">
         <circle riot-cx="{ 5 }" riot-cy="{ 5 }" r="2" fill="black"></circle>
       </svg>
     `)
@@ -341,6 +341,7 @@ describe('Riot core', function() {
     var tag = riot.mount('crazy-svg')[0]
 
     expect($('svg', tag.root).getAttribute('viewBox')).to.be.equal('0 0 300 300')
+    expect($('svg', tag.root).getAttribute('preserveAspectRatio')).to.be.equal('xMinYMax meet')
 
     tag.unmount()
   })
@@ -382,6 +383,7 @@ describe('Riot core', function() {
     expect($('input', divs[3]).getAttribute('name')).to.be.equal('calendar')
     expect(tag.tags['dynamic-data-toggle']).to.be.an('object')
 
+
     tag.single = 'color'
     tag.toggle = false
     tag.intags[0].name = 'ddd'
@@ -415,8 +417,10 @@ describe('Riot core', function() {
     expect(tag.tags.color.length).to.be.equal(2)
 
     // single tags as tag object and not array after delete
+
     tag.intags.splice(1, 1)
     tag.update()
+
     expect(tag.tags.color).to.be.an('object')
 
     tag.unmount()
@@ -657,11 +661,11 @@ describe('Riot core', function() {
     riot.tag('riot-tmp', `
       <p>{ flag }<p>
     `, function() {
-        this.flag = true
-        this.on('before-mount', () => {
-          this.flag = false
-        })
+      this.flag = true
+      this.on('before-mount', () => {
+        this.flag = false
       })
+    })
 
     var tag = riot.mount('riot-tmp')[0]
 
@@ -850,6 +854,20 @@ describe('Riot core', function() {
     tag.update()
 
     expect(getCarrotPos(tag.refs.i)).to.be.equal(4)
+
+    tag.unmount()
+  })
+
+  it('does not set value attribute', function() {
+
+    injectHTML('<input-values></input-values>')
+
+    var tag = riot.mount('input-values')[0]
+    expect(tag.refs.i.value).to.be.equal('hi')
+    expect(tag.refs.i.hasAttribute('value')).to.be.false
+    tag.update()
+    expect(tag.refs.i.value).to.be.equal('foo')
+    expect(tag.refs.i.hasAttribute('value')).to.be.false
 
     tag.unmount()
   })
@@ -1073,11 +1091,11 @@ describe('Riot core', function() {
 
   })
 
-  it('the class attributes get properly removed in case of falsy values', function() {
+  it('the class attributes get properly removed in case of falsy values', function(done) {
 
     injectHTML('<riot-tmp></riot-tmp>')
 
-    riot.tag('riot-tmp', '<p class="{ foo: isFoo }"></p>', function() {
+    riot.tag('riot-tmp', '<p class="{ foo: isFoo }">foo</p>', function() {
       this.isFoo = true
     })
 
@@ -1085,12 +1103,15 @@ describe('Riot core', function() {
       p = $('p', tag.root)
 
     expect(p.hasAttribute('class')).to.be.equal(true)
-    tag.isFoo = false
-    tag.update()
-    expect(p.hasAttribute('class')).to.be.equal(false)
 
-    tag.unmount()
-
+    // Edge 16 has some race condition issues so we need to defer this check
+    setTimeout(() => {
+      tag.isFoo = false
+      tag.update()
+      expect(p.hasAttribute('class')).to.be.equal(false)
+      tag.unmount()
+      done()
+    }, 100)
   })
 
   it('custom attributes should not be removed if not falsy', function() {
@@ -1248,8 +1269,8 @@ describe('Riot core', function() {
       <div ref="{ false }"></div>
       <div ref="{ '' }"></div>
     `, function() {
-        this.expr = 'expr'
-      })
+      this.expr = 'expr'
+    })
 
     var tag = riot.mount('riot-tmp')[0],
       divs = $$('div', tag.root)
@@ -1471,5 +1492,69 @@ describe('Riot core', function() {
 
     tag.unmount()
     riot.settings.autoUpdate = true
+  })
+
+  it('updates during the mount event should properly update the DOM', function() {
+    injectHTML('<riot-tmp></riot-tmp>')
+
+    riot.tag('riot-tmp', '<p ref="p">{ message }</p>', function() {
+      this.message = 'hi'
+      this.on('mount', () => {
+        this.message = 'goodbye'
+        this.update()
+      })
+    })
+
+    var tag = riot.mount('riot-tmp')[0]
+    expect(tag.refs.p.innerHTML).to.be.equal('goodbye')
+    tag.unmount()
+  })
+
+  it('avoid to get ref attributes on yield tags', function() {
+    injectHTML('<riot-tmp></riot-tmp>')
+
+    riot.tag('riot-tmp', '<yield ref="foo"/>')
+
+    var tag = riot.mount('riot-tmp')[0]
+    expect(tag.refs.foo).to.be.undefined
+    tag.unmount()
+  })
+
+  it('remove style attributes if they contain blank values', function() {
+    injectHTML('<riot-tmp></riot-tmp>')
+
+    riot.tag('riot-tmp', "<p ref='p' riot-style=\"{changed ? 'background-color: green' : ''}\"></p>", function() {
+      this.changed = true
+    })
+
+    var tag = riot.mount('riot-tmp')[0]
+    expect(tag.refs.p.hasAttribute('style')).to.be.ok
+    tag.changed = false
+    tag.update()
+    expect(tag.refs.p.hasAttribute('style')).to.be.not.ok
+
+    tag.unmount()
+  })
+
+  it('avoid to clean the DOM for the default riot.unmount call', function(done) {
+    injectHTML('<riot-tmp></riot-tmp>')
+
+    riot.tag('riot-tmp-sub', '<p id="{ id }">foo</p>', function() {
+      this.id = `id-${ this._riot_id }`
+
+      this.on('before-unmount', () => {
+        expect(document.getElementById(this.id)).to.be.ok
+        done()
+      })
+    })
+
+    riot.tag('riot-tmp', '<riot-tmp-sub></riot-tmp-sub>')
+
+    var tag = riot.mount('riot-tmp')[0]
+
+    setTimeout(() => {
+      expect(document.getElementById(tag.tags['riot-tmp-sub'].id)).to.be.ok
+      tag.unmount()
+    }, 100)
   })
 })

@@ -6,7 +6,7 @@ import {
   getRiotStyles
 } from '../../../helpers/index'
 
-import '../../../tag/bug-2369.tag'
+//import '../../../tag/bug-2369.tag'
 
 
 describe('Riot compiler', function() {
@@ -150,12 +150,19 @@ describe('Riot compiler', function() {
     tag.unmount()
   })
 
-  it('tags containing regex get properly compiled', function() {
+  it('tags containing regex get properly compiled', function(done) {
     injectHTML('<bug-2369></bug-2369>')
-    const tag = riot.mount('bug-2369')[0]
+    riot.compile('./tag/bug-2369.tag', function () {
+      const tag = riot.mount('bug-2369')[0]
+      expect(tag.root).to.be.ok
+      tag.unmount()
+      done()
+    })
+  })
 
-    expect(tag.root).to.be.ok
-
-    tag.unmount()
+  it('throw compile.error in case a file will be not found', function(done) {
+    // override the compile error function
+    riot.compile.error = () => done()
+    riot.compile('./foo/bar.tag')
   })
 })

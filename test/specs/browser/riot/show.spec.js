@@ -1,4 +1,3 @@
-
 import {
   injectHTML,
   $,
@@ -75,9 +74,9 @@ describe('Riot show/hide', function() {
     riot.tag('riot-tmp', `
       <riot-tmp-sub each="{ item in items }" show="{selected === item}"></riot-tmp-sub>
     `, function() {
-        this.items = ['uno', 'due']
-        this.selected = 'uno'
-      })
+      this.items = ['uno', 'due']
+      this.selected = 'uno'
+    })
     riot.tag('riot-tmp-sub', '<p>{ opts.item }</p>')
     injectHTML('<riot-tmp></riot-tmp>')
 
@@ -95,8 +94,8 @@ describe('Riot show/hide', function() {
     riot.tag('riot-tmp', `
       <riot-tmp-sub show="{number === 1}"></riot-tmp-sub>
     `, function() {
-        this.number = 1
-      })
+      this.number = 1
+    })
     riot.tag('riot-tmp-sub', '<p ref="p" if={number === 2}>{ opts.item }</p>', function() {
       this.number = 2
     })
@@ -105,6 +104,35 @@ describe('Riot show/hide', function() {
     var tag = riot.mount('riot-tmp')[0]
 
     expect(tag.tags['riot-tmp-sub'].refs.p.hidden).to.be.not.ok
+
+    tag.unmount()
+  })
+
+  it('the show directive combined with yield behaves consistently like the if directive (see #2448)', function() {
+    riot.tag('riot-tmp', `<riot-tmp-sub>
+        <h1 if='{parent.doIt}'>show</h1>
+        <h2 show='{parent.doIt}'>show</h2>
+      </riot-tmp-sub>`,
+    function() {
+      this.doIt = true
+    })
+
+    riot.tag('riot-tmp-sub', '<yield/>')
+
+    injectHTML('<riot-tmp></riot-tmp>')
+
+    const tag = riot.mount('riot-tmp')[0],
+      subRoot = tag.tags['riot-tmp-sub'].root
+
+
+    expect($('h1', subRoot)).to.be.ok
+    expect($('h2', subRoot).hidden).to.be.not.ok
+
+    tag.doIt = false
+    tag.update()
+
+    expect($('h1', subRoot)).to.be.not.ok
+    expect($('h2', subRoot).hidden).to.be.ok
 
     tag.unmount()
   })

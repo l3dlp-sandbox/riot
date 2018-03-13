@@ -1,6 +1,13 @@
 language: node_js
+
+sudo: false
+dist: trusty
+
+addons:
+  chrome: stable
+
 node_js:
-  - 6
+  - 8
 
 branches:
   only:
@@ -10,8 +17,6 @@ branches:
 
 script:
   make riot
-
-sudo: false
 
 after_success:
   test $TRAVIS_PULL_REQUEST == "false" && make test-sauce && make test-coveralls

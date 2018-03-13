@@ -1,7 +1,8 @@
 import {
   injectHTML,
   expectHTML,
-  $$
+  $$,
+  fireEvent
 } from '../../../helpers/index'
 
 
@@ -200,8 +201,8 @@ describe('Riot if', function() {
     riot.tag('riot-tmp', `
       <div each="{item, i in items}" if="{item.cond}">{i}</div>
     `, function() {
-        this.items = [{cond: true}, {cond: false}]
-      })
+      this.items = [{cond: true}, {cond: false}]
+    })
     var tag = riot.mount('riot-tmp')[0]
     expectHTML(tag).to.be.equal('<div>0</div>')
     tag.items[1].cond = true
@@ -222,6 +223,32 @@ describe('Riot if', function() {
     tag.update()
     expectHTML(tag.root).to.be.equal('<div><select><option value="1">One</option><option value="2">Two</option></select></div>')
 
+    tag.unmount()
+  })
+
+  it('conditional custom tags shouldn\'t dispatch only one "mount" event if toggled mounted', () => {
+    injectHTML('<riot-tmp></riot-tmp>')
+    const mountEvent = sinon.spy()
+
+    riot.tag('riot-tmp', `
+      <riot-tmp-sub if="{ showChild }"></riot-tmp-sub>
+      <button ref="button" onclick="{ toggle }">btn</button>
+    `, function() {
+      this.showChild = true
+      this.on('mount', () => {
+        this.update()
+      })
+      this.toggle = () => this.update()
+    })
+
+    riot.tag('riot-tmp-sub', '<p>subtag</p>', function() {
+      this.on('mount', mountEvent)
+    })
+
+    const [tag] = riot.mount('riot-tmp')
+
+    fireEvent(tag.refs.button, 'click')
+    expect(mountEvent, 'mount event').to.have.been.calledOnce
     tag.unmount()
   })
 })
